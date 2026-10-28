@@ -8,6 +8,8 @@
 - **0.2.x 上六个补丁的锚点全部重新对过**：web auth（`isAuthenticated` 单点）、link→rename、flock、附件 fsync、client-modules 去抖都已适配 0.2.1-rc.2 的真实构建产物；关卡复核脚本同步改了判断条件（g2 只要求 `rename` 已被 import，g6 只要求 node-pty 没有被静态 import）。
 - **0.2.x 在手机上根本起不来：界面卡在「正在等待 3080 就绪」**。0.2.x 的启动流程通过 `node-addon-require-builtin` 读取 Node 内部模块，而这个包只提供 darwin 与 linux（glibc/musl）的预编译二进制，Android 用的 bionic 一个都没有。模块在自己的加载阶段就抛错，`dsh web` 在绑定 3080 之前退出，App 于是一直等端口。
   - 新增 `patch-dsh-require-builtin.mjs`：能用原生绑定就照旧用，用不了就退回 `--expose-internals` 下的普通 `require`（dsh 自己的两个调用方本来就是先试这条路）。补丁同时进了 Shizuku 版与 Root 版的部署包，关卡校验新增 g14 复核。
+- **手机会莫名其妙没有 DNS，个人热点开起来几秒就自动关闭**。Root 版的开机脚本和看门狗会在 DNS 本来就正常的手机上启动 `dns-fwd`（绑 `0.0.0.0:53`）并把所有 `:53` 流量重定向到本机。Android 16 的 netd 自己就在 `127.0.0.1:53` 上解析，两者冲突后 tethering 写入 DNS 转发器失败（`EREMOTEIO 121`），热点会话整体回滚，界面上就是「热点已关闭」；同一原因也让整机解析不了域名，DSH 的模型请求随之失败。
+  - 两个脚本现在先探测系统解析：能解析就完全不接管 `:53`，并撤掉之前遗留的重定向；只有确实解析不了时才启用 DoH 转发。
 - **部署顺序调整**：`.dsh-setup-ok` 标记与关卡复核挪到最后，先写入 Key/插件/权限再复核。复核失败时环境仍是完整的，重跑走快速路径只复核关卡，不用重新下载。
 - **手机端布局适配 0.2.1 的前端结构**：右栏类名从 `detailsCol` 改成了 `rightbarCol`，折叠状态属性从 `data-details-collapsed` 改成了 `data-rightbar-collapsed`，移动端抽屉布局恢复生效。
 - **`curl` 拉取第三方 APK 的网络兼容**：GitHub release 资源被挡、但 github.com 可通的网络下，`tools/fetch-assets.sh` 现在会依次尝试 `gh-proxy.com`、`ghfast.top` 两个镜像。
