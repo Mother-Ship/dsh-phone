@@ -115,7 +115,11 @@ start_dsh() {
   uid=$(stat -c %u /data/data/com.termux 2>/dev/null)
   case "$uid" in ''|*[!0-9]*) log "dsh: cannot resolve Termux uid — skip"; return 1 ;; esac
   # Run as the Termux uid: dsh web must not create root-owned files in $THOME.
-  setsid su "$uid" -c "$PREFIX/bin/bash $THOME/start-dsh.sh" >/dev/null 2>&1 </dev/null &
+  # `cd $THOME` first: this loop's own cwd is /data/adb/service.d, and dsh loads a
+  # .env from the launch directory — that one is root-600, so every boot logged
+  # "failed to load .env: EACCES". Starting from the Termux home also keeps the
+  # default workspace what the user expects.
+  setsid su "$uid" -c "cd $THOME && exec $PREFIX/bin/bash $THOME/start-dsh.sh" >/dev/null 2>&1 </dev/null &
   return 0
 }
 
